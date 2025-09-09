@@ -7,6 +7,7 @@ function App() {
 	const [error, setError] = useState<string | null>(null)
 	const [isProcessing, setIsProcessing] = useState(false)
 	const [isDragging, setIsDragging] = useState(false)
+	const [isImageLoaded, setIsImageLoaded] = useState(false)
 	const fileInputRef = useRef<HTMLInputElement | null>(null)
 	const videoRef = useRef<HTMLVideoElement | null>(null)
 	const lastProcessedKeyRef = useRef<string | null>(null)
@@ -14,6 +15,7 @@ function App() {
 	const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
 		setError(null)
 		setImageUrl(null)
+		setIsImageLoaded(false)
 		const file = e.target.files?.[0] ?? null
 		setVideoFile(file)
 	}, [])
@@ -23,6 +25,7 @@ function App() {
 		setIsDragging(false)
 		setError(null)
 		setImageUrl(null)
+		setIsImageLoaded(false)
 		const file = e.dataTransfer.files?.[0]
 		if (file && /video\/(mp4|webm)/.test(file.type)) {
 			setVideoFile(file)
@@ -111,6 +114,7 @@ function App() {
 		setError(null)
 		setIsProcessing(true)
 		setImageUrl(null)
+		setIsImageLoaded(false)
 		try {
 			const blob = await extractLastFrame(videoFile)
 			const previewUrl = URL.createObjectURL(blob)
@@ -123,7 +127,6 @@ function App() {
 		}
 	}, [videoFile])
 
-	// ダウンロード処理（コントロール行のボタンから実行）
 	const handleDownload = useCallback(() => {
 		if (!imageUrl) return
 		const a = document.createElement('a')
@@ -134,7 +137,6 @@ function App() {
 		a.remove()
 	}, [imageUrl, videoFile])
 
-	// アップロード/ドロップ時に自動抽出
 	useEffect(() => {
 		if (!videoFile) {
 			lastProcessedKeyRef.current = null
@@ -150,6 +152,7 @@ function App() {
 		setVideoFile(null)
 		if (imageUrl) URL.revokeObjectURL(imageUrl)
 		setImageUrl(null)
+		setIsImageLoaded(false)
 		setError(null)
 		if (videoRef.current) {
 			videoRef.current.src = ''
@@ -198,9 +201,11 @@ function App() {
 			</section>
 
 			<div className="controls">
-				<button className="primary" onClick={handleDownload} disabled={!imageUrl}>
-					ダウンロード
-				</button>
+				{isImageLoaded && (
+					<button className="primary" onClick={handleDownload}>
+						ダウンロード
+					</button>
+				)}
 				<button onClick={handleClear} disabled={!videoFile && !imageUrl}>
 					クリア
 				</button>
@@ -215,7 +220,7 @@ function App() {
 			<div className="preview">
 				{imageUrl ? (
 					<div className="preview-card">
-						<img src={imageUrl} alt="last frame preview" />
+						<img src={imageUrl} alt="last frame preview" onLoad={() => setIsImageLoaded(true)} />
 					</div>
 				) : (
 					<p className="placeholder">ここにプレビューが表示されます</p>
