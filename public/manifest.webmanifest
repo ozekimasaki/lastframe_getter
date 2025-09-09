@@ -1,0 +1,13 @@
+{
+  "name": "Last Frame Getter",
+  "short_name": "LastFrame",
+  "description": "MP4/WebM の最後の1フレームを PNG で取得",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#646cff",
+  "background_color": "#ffffff",
+  "icons": [
+    { "src": "/vite.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

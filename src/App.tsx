@@ -227,6 +227,10 @@ function App() {
 				)}
 			</div>
 
+			<footer className="footer">
+				<p>© 2025 Last Frame Getter</p>
+			</footer>
+
 			{/* 非表示のビデオ要素（デバッグ/将来拡張用） */}
 			<video ref={videoRef} style={{ display: 'none' }} />
 		</div>
