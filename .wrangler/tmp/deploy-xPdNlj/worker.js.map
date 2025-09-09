@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "sources": ["../../../src/worker.ts"],
+  "sourceRoot": "C:\\Users\\masam\\Documents\\lastframe_getter\\.wrangler\\tmp\\deploy-xPdNlj",
+  "sourcesContent": ["export interface Env {\r\n\tASSETS: { fetch(request: Request): Promise<Response> }\r\n}\r\n\r\nexport default {\r\n\tasync fetch(request: Request, env: Env): Promise<Response> {\r\n\t\t// \u307E\u305A\u9759\u7684\u30A2\u30BB\u30C3\u30C8\u3068\u3057\u3066\u89E3\u6C7A\r\n\t\tlet response = await env.ASSETS.fetch(request)\r\n\r\n\t\t// \u898B\u3064\u304B\u3089\u306A\u3044\u5834\u5408\u3001SPA \u7528\u306B /index.html \u3092\u8FD4\u3059\uFF08GET \u306E\u307F\uFF09\r\n\t\tif (response.status === 404 && request.method === 'GET') {\r\n\t\t\tconst url = new URL(request.url)\r\n\t\t\tconst indexReq = new Request(new URL('/index.html', url.origin).toString(), {\r\n\t\t\t\tmethod: 'GET',\r\n\t\t\t\theaders: request.headers,\r\n\t\t\t})\r\n\t\t\tresponse = await env.ASSETS.fetch(indexReq)\r\n\t\t}\r\n\r\n\t\treturn response\r\n\t},\r\n}\r\n"],
+  "mappings": ";AAIA,IAAO,iBAAQ;AAAA,EACd,MAAM,MAAM,SAAkB,KAA6B;AAE1D,QAAI,WAAW,MAAM,IAAI,OAAO,MAAM,OAAO;AAG7C,QAAI,SAAS,WAAW,OAAO,QAAQ,WAAW,OAAO;AACxD,YAAM,MAAM,IAAI,IAAI,QAAQ,GAAG;AAC/B,YAAM,WAAW,IAAI,QAAQ,IAAI,IAAI,eAAe,IAAI,MAAM,EAAE,SAAS,GAAG;AAAA,QAC3E,QAAQ;AAAA,QACR,SAAS,QAAQ;AAAA,MAClB,CAAC;AACD,iBAAW,MAAM,IAAI,OAAO,MAAM,QAAQ;AAAA,IAC3C;AAEA,WAAO;AAAA,EACR;AACD;",
+  "names": []
+}

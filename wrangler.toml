@@ -1,12 +1,16 @@
 name = "lastframe-getter"
 main = "src/worker.ts"
 compatibility_date = "2025-09-09"
+workers_dev = true
 
 [assets]
 directory = "dist/client"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-workers_dev = true
+
+[[routes]]
+pattern = "lastframe.umaibo.dev"
+custom_domain = true
 
 [vars]
 NODE_ENV = "production"
