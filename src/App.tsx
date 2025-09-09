@@ -123,6 +123,17 @@ function App() {
 		}
 	}, [videoFile])
 
+	// ダウンロード処理（コントロール行のボタンから実行）
+	const handleDownload = useCallback(() => {
+		if (!imageUrl) return
+		const a = document.createElement('a')
+		a.href = imageUrl
+		a.download = (videoFile?.name || 'lastframe') + '.png'
+		document.body.appendChild(a)
+		a.click()
+		a.remove()
+	}, [imageUrl, videoFile])
+
 	// アップロード/ドロップ時に自動抽出
 	useEffect(() => {
 		if (!videoFile) {
@@ -187,6 +198,9 @@ function App() {
 			</section>
 
 			<div className="controls">
+				<button className="primary" onClick={handleDownload} disabled={!imageUrl}>
+					ダウンロード
+				</button>
 				<button onClick={handleClear} disabled={!videoFile && !imageUrl}>
 					クリア
 				</button>
@@ -202,11 +216,6 @@ function App() {
 				{imageUrl ? (
 					<div className="preview-card">
 						<img src={imageUrl} alt="last frame preview" />
-						<div className="actions">
-							<a className="button primary" href={imageUrl} download={(videoFile?.name || 'lastframe') + '.png'}>
-								ダウンロード
-							</a>
-						</div>
 					</div>
 				) : (
 					<p className="placeholder">ここにプレビューが表示されます</p>
