@@ -6,6 +6,8 @@ function App() {
 	const [imageUrl, setImageUrl] = useState<string | null>(null)
 	const [error, setError] = useState<string | null>(null)
 	const [isProcessing, setIsProcessing] = useState(false)
+	const [isDragging, setIsDragging] = useState(false)
+	const fileInputRef = useRef<HTMLInputElement | null>(null)
 	const videoRef = useRef<HTMLVideoElement | null>(null)
 
 	const isVideoSelected = useMemo(() => Boolean(videoFile), [videoFile])
@@ -15,6 +17,32 @@ function App() {
 		setImageUrl(null)
 		const file = e.target.files?.[0] ?? null
 		setVideoFile(file)
+	}, [])
+
+	const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+		e.preventDefault()
+		setIsDragging(false)
+		setError(null)
+		setImageUrl(null)
+		const file = e.dataTransfer.files?.[0]
+		if (file && /video\/(mp4|webm)/.test(file.type)) {
+			setVideoFile(file)
+		} else {
+			setError('mp4 または webm の動画ファイルをドロップしてください。')
+		}
+	}, [])
+
+	const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+		e.preventDefault()
+		setIsDragging(true)
+	}, [])
+
+	const handleDragLeave = useCallback(() => {
+		setIsDragging(false)
+	}, [])
+
+	const openFilePicker = useCallback(() => {
+		fileInputRef.current?.click()
 	}, [])
 
 	async function waitForEvent(target: EventTarget, eventName: string): Promise<void> {
@@ -65,7 +93,8 @@ function App() {
 		}
 
 		// 最後の 1 フレームへシーク（ごく僅か手前に設定）
-		const targetTime = Math.max(0, video.duration - 0.000001)
+		const epsilon = 0.000001
+		const targetTime = Math.max(0, video.duration - epsilon)
 		await seek(video, targetTime)
 
 		ctx.drawImage(video, 0, 0, width, height)
@@ -107,15 +136,46 @@ function App() {
 
 	return (
 		<div className="app-container">
-			<h1>Last Frame Getter</h1>
-			<p className="subtitle">mp4 / webm の最後の 1 フレームを画像(PNG)にします</p>
+			<header className="header">
+				<h1>Last Frame Getter</h1>
+				<p className="subtitle">mp4 / webm の最後の 1 フレームを画像(PNG)にします</p>
+			</header>
+
+			<section
+				className={`dropzone${isDragging ? ' is-dragging' : ''}`}
+				onDrop={handleDrop}
+				onDragOver={handleDragOver}
+				onDragEnter={handleDragOver}
+				onDragLeave={handleDragLeave}
+				role="button"
+				tabIndex={0}
+				aria-busy={isProcessing}
+				onKeyDown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault()
+						openFilePicker()
+					}
+				}}
+			>
+				<div className="dropzone-inner">
+					<p className="dropzone-text">
+						ここにファイルをドラッグ＆ドロップするか、
+						<button className="button linklike" onClick={openFilePicker} type="button">
+							ファイルを選択
+						</button>
+					</p>
+					<p className="hint">対応形式: mp4, webm</p>
+					<input
+						ref={fileInputRef}
+						className="file-input"
+						type="file"
+						accept="video/mp4,video/webm"
+						onChange={handleFileChange}
+					/>
+				</div>
+			</section>
 
 			<div className="controls">
-				<input
-					type="file"
-					accept="video/mp4,video/webm"
-					onChange={handleFileChange}
-				/>
 				<button onClick={handleExtract} disabled={!isVideoSelected || isProcessing}>
 					{isProcessing ? '処理中…' : '最後の1フレームを抽出'}
 				</button>
@@ -124,14 +184,18 @@ function App() {
 				</button>
 			</div>
 
-			{error && <p className="error">{error}</p>}
+			{error && (
+				<p className="error" role="alert" aria-live="polite">
+					{error}
+				</p>
+			)}
 
 			<div className="preview">
 				{imageUrl ? (
 					<div className="preview-card">
 						<img src={imageUrl} alt="last frame preview" />
 						<div className="actions">
-							<a href={imageUrl} download={(videoFile?.name || 'lastframe') + '.png'}>
+							<a className="button primary" href={imageUrl} download={(videoFile?.name || 'lastframe') + '.png'}>
 								ダウンロード
 							</a>
 						</div>

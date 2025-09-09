@@ -1,42 +1,123 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+.app-container {
+	max-width: 960px;
+	margin: 0 auto;
+	padding: 2rem 1rem 4rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.header {
+	text-align: center;
+	margin-bottom: 1.5rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.subtitle {
+	color: #888;
+	margin-top: 0.25rem;
+	font-size: 0.95rem;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.dropzone {
+	position: relative;
+	border: 2px dashed #7a7a7a;
+	border-radius: 12px;
+	padding: 28px 20px;
+	text-align: center;
+	background: rgba(255, 255, 255, 0.02);
+	transition: background 0.2s, border-color 0.2s;
+	outline: none;
+	margin-bottom: 1rem;
+}
+.dropzone.is-dragging {
+	background: rgba(100, 108, 255, 0.08);
+	border-color: #646cff;
+}
+.dropzone:focus {
+	border-color: #646cff;
+}
+.dropzone .dropzone-inner {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	align-items: center;
+	justify-content: center;
+}
+.dropzone .dropzone-text {
+	margin: 0;
+}
+.hint {
+	color: #aaa;
+	font-size: 0.85rem;
+	margin: 0;
+}
+.file-input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
 }
 
-.card {
-  padding: 2em;
+.controls {
+	display: flex;
+	gap: 8px;
+	justify-content: center;
+	margin: 12px 0 24px;
 }
 
-.read-the-docs {
-  color: #888;
+.button.linklike {
+	padding: 0;
+	background: none;
+	border: none;
+	color: #646cff;
+	text-decoration: underline;
+	cursor: pointer;
+	font: inherit;
+}
+
+.button.primary,
+button.primary {
+	background: #646cff;
+	border-color: #646cff;
+	color: white;
+}
+.button.primary:hover,
+button.primary:hover {
+	filter: brightness(1.05);
+}
+
+.preview {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 12px;
+}
+
+.preview-card {
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	border-radius: 12px;
+	padding: 12px;
+	background: rgba(255, 255, 255, 0.03);
+}
+.preview-card img {
+	max-width: 100%;
+	display: block;
+	border-radius: 8px;
+}
+.preview-card .actions {
+	margin-top: 8px;
+	display: flex;
+	justify-content: flex-end;
+}
+
+.placeholder {
+	text-align: center;
+	color: #888;
+}
+
+.error {
+	margin: 8px 0;
+	color: #ff6363;
+	text-align: center;
+}
+
+@media (min-width: 720px) {
+	.app-container {
+		padding: 2rem 2rem 4rem;
+	}
 }
