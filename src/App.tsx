@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 
 function App() {
@@ -9,8 +9,7 @@ function App() {
 	const [isDragging, setIsDragging] = useState(false)
 	const fileInputRef = useRef<HTMLInputElement | null>(null)
 	const videoRef = useRef<HTMLVideoElement | null>(null)
-
-	const isVideoSelected = useMemo(() => Boolean(videoFile), [videoFile])
+	const lastProcessedKeyRef = useRef<string | null>(null)
 
 	const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
 		setError(null)
@@ -124,6 +123,18 @@ function App() {
 		}
 	}, [videoFile])
 
+	// アップロード/ドロップ時に自動抽出
+	useEffect(() => {
+		if (!videoFile) {
+			lastProcessedKeyRef.current = null
+			return
+		}
+		const key = `${videoFile.name}-${videoFile.size}-${videoFile.lastModified}`
+		if (lastProcessedKeyRef.current === key) return
+		lastProcessedKeyRef.current = key
+		void handleExtract()
+	}, [videoFile, handleExtract])
+
 	const handleClear = useCallback(() => {
 		setVideoFile(null)
 		if (imageUrl) URL.revokeObjectURL(imageUrl)
@@ -164,7 +175,7 @@ function App() {
 							ファイルを選択
 						</button>
 					</p>
-					<p className="hint">対応形式: mp4, webm</p>
+					<p className="hint">アップロードすると自動で抽出します（対応形式: mp4, webm）</p>
 					<input
 						ref={fileInputRef}
 						className="file-input"
@@ -176,9 +187,6 @@ function App() {
 			</section>
 
 			<div className="controls">
-				<button onClick={handleExtract} disabled={!isVideoSelected || isProcessing}>
-					{isProcessing ? '処理中…' : '最後の1フレームを抽出'}
-				</button>
 				<button onClick={handleClear} disabled={!videoFile && !imageUrl}>
 					クリア
 				</button>
