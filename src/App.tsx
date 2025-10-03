@@ -4,35 +4,39 @@ import './App.css'
 function App() {
 	const [videoFile, setVideoFile] = useState<File | null>(null)
 	const [imageUrl, setImageUrl] = useState<string | null>(null)
+	const [fps, setFps] = useState<number>(30)
+	const [selectedFrame, setSelectedFrame] = useState<number>(0)
+	const [maxFrames, setMaxFrames] = useState<number>(1)
 	const [error, setError] = useState<string | null>(null)
 	const [isProcessing, setIsProcessing] = useState(false)
 	const [isDragging, setIsDragging] = useState(false)
-	const [isImageLoaded, setIsImageLoaded] = useState(false)
 	const fileInputRef = useRef<HTMLInputElement | null>(null)
 	const videoRef = useRef<HTMLVideoElement | null>(null)
-	const lastProcessedKeyRef = useRef<string | null>(null)
+	const videoObjectUrlRef = useRef<string | null>(null)
+	const canvasRef = useRef<HTMLCanvasElement | null>(null)
+	const renderTokenRef = useRef<number>(0)
 
 	const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
 		setError(null)
+		if (imageUrl) URL.revokeObjectURL(imageUrl)
 		setImageUrl(null)
-		setIsImageLoaded(false)
 		const file = e.target.files?.[0] ?? null
 		setVideoFile(file)
-	}, [])
+	}, [imageUrl])
 
 	const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
 		e.preventDefault()
 		setIsDragging(false)
 		setError(null)
+		if (imageUrl) URL.revokeObjectURL(imageUrl)
 		setImageUrl(null)
-		setIsImageLoaded(false)
 		const file = e.dataTransfer.files?.[0]
 		if (file && /video\/(mp4|webm)/.test(file.type)) {
 			setVideoFile(file)
 		} else {
 			setError('mp4 または webm の動画ファイルをドロップしてください。')
 		}
-	}, [])
+	}, [imageUrl])
 
 	const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
 		e.preventDefault()
@@ -68,94 +72,112 @@ function App() {
 		})
 	}
 
-	async function extractLastFrame(file: File): Promise<Blob> {
-		const url = URL.createObjectURL(file)
-		const video = document.createElement('video')
-		video.preload = 'auto'
-		video.muted = true
-		video.playsInline = true
-		video.src = url
-
-		await waitForEvent(video, 'loadedmetadata')
-
+	async function renderFrameByIndex(index: number): Promise<void> {
+		const video = videoRef.current
+		if (!video) return
 		const width = video.videoWidth
 		const height = video.videoHeight
-		if (!width || !height) {
-			URL.revokeObjectURL(url)
-			throw new Error('動画の寸法を取得できません。')
-		}
-
-		const canvas = document.createElement('canvas')
-		canvas.width = width
-		canvas.height = height
-		const ctx = canvas.getContext('2d')
-		if (!ctx) {
-			URL.revokeObjectURL(url)
-			throw new Error('Canvas コンテキストの取得に失敗しました。')
-		}
-
-		// 最後の 1 フレームへシーク（ごく僅か手前に設定）
+		if (!width || !height) return
 		const epsilon = 0.000001
-		const targetTime = Math.max(0, video.duration - epsilon)
-		await seek(video, targetTime)
-
-		ctx.drawImage(video, 0, 0, width, height)
-
-		const blob: Blob = await new Promise((resolve, reject) => {
-			canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('画像の生成に失敗しました。'))), 'image/png')
-		})
-
-		URL.revokeObjectURL(url)
-		return blob
-	}
-
-	const handleExtract = useCallback(async () => {
-		if (!videoFile) return
-		setError(null)
+		const duration = video.duration || 0
+		const time = Math.min(Math.max(0, index / Math.max(1, fps)), Math.max(0, duration - epsilon))
+		const token = ++renderTokenRef.current
 		setIsProcessing(true)
-		setImageUrl(null)
-		setIsImageLoaded(false)
 		try {
-			const blob = await extractLastFrame(videoFile)
-			const previewUrl = URL.createObjectURL(blob)
-			setImageUrl(previewUrl)
+			await seek(video, time)
+			if (token !== renderTokenRef.current) return
+			const canvas = canvasRef.current ?? (canvasRef.current = document.createElement('canvas'))
+			if (canvas.width !== width) canvas.width = width
+			if (canvas.height !== height) canvas.height = height
+			const ctx = canvas.getContext('2d')
+			if (!ctx) throw new Error('Canvas コンテキストの取得に失敗しました。')
+			ctx.drawImage(video, 0, 0, width, height)
+			const blob: Blob = await new Promise((resolve, reject) => {
+				canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('画像の生成に失敗しました。'))), 'image/png')
+			})
+			if (token !== renderTokenRef.current) return
+			if (imageUrl) URL.revokeObjectURL(imageUrl)
+			const url = URL.createObjectURL(blob)
+			setImageUrl(url)
 		} catch (e: unknown) {
 			const message = e instanceof Error ? e.message : '未知のエラーが発生しました。'
 			setError(message)
 		} finally {
-			setIsProcessing(false)
+			if (token === renderTokenRef.current) setIsProcessing(false)
 		}
-	}, [videoFile])
+	}
 
 	const handleDownload = useCallback(() => {
 		if (!imageUrl) return
 		const a = document.createElement('a')
 		a.href = imageUrl
-		a.download = (videoFile?.name || 'lastframe') + '.png'
+		const base = (videoFile?.name || 'frame').replace(/\.(mp4|webm)$/i, '')
+		a.download = `${base}-frame-${selectedFrame}.png`
 		document.body.appendChild(a)
 		a.click()
 		a.remove()
-	}, [imageUrl, videoFile])
+	}, [imageUrl, videoFile, selectedFrame])
 
 	useEffect(() => {
 		if (!videoFile) {
-			lastProcessedKeyRef.current = null
+			// クリーンアップ
+			if (imageUrl) URL.revokeObjectURL(imageUrl)
+			setImageUrl(null)
+			if (videoObjectUrlRef.current) {
+				URL.revokeObjectURL(videoObjectUrlRef.current)
+				videoObjectUrlRef.current = null
+			}
 			return
 		}
-		const key = `${videoFile.name}-${videoFile.size}-${videoFile.lastModified}`
-		if (lastProcessedKeyRef.current === key) return
-		lastProcessedKeyRef.current = key
-		void handleExtract()
-	}, [videoFile, handleExtract])
+		const video = videoRef.current
+		if (!video) return
+		// 新しい動画の読み込み
+		const objectUrl = URL.createObjectURL(videoFile)
+		videoObjectUrlRef.current = objectUrl
+		video.src = objectUrl
+		const setup = async () => {
+			await waitForEvent(video, 'loadedmetadata')
+			const width = video.videoWidth
+			const height = video.videoHeight
+			if (!width || !height) throw new Error('動画の寸法を取得できません。')
+			const duration = video.duration || 0
+			const totalFrames = Math.max(1, Math.floor(duration * Math.max(1, fps)))
+			setMaxFrames(totalFrames)
+			setSelectedFrame(Math.max(0, totalFrames - 1))
+		}
+		void setup()
+		return () => {
+			// 切り替え時の後始末
+			if (imageUrl) URL.revokeObjectURL(imageUrl)
+			setImageUrl(null)
+		}
+	}, [videoFile])
+
+	useEffect(() => {
+		const video = videoRef.current
+		if (!video || !videoFile) return
+		const duration = video.duration || 0
+		const total = Math.max(1, Math.floor(duration * Math.max(1, fps)))
+		setMaxFrames(total)
+		setSelectedFrame((prev) => Math.min(prev, total - 1))
+	}, [fps, videoFile])
+
+	useEffect(() => {
+		if (!videoFile) return
+		void renderFrameByIndex(selectedFrame)
+	}, [selectedFrame, fps, videoFile])
 
 	const handleClear = useCallback(() => {
 		setVideoFile(null)
 		if (imageUrl) URL.revokeObjectURL(imageUrl)
 		setImageUrl(null)
-		setIsImageLoaded(false)
 		setError(null)
 		if (videoRef.current) {
 			videoRef.current.src = ''
+		}
+		if (videoObjectUrlRef.current) {
+			URL.revokeObjectURL(videoObjectUrlRef.current)
+			videoObjectUrlRef.current = null
 		}
 	}, [imageUrl])
 
@@ -163,7 +185,7 @@ function App() {
 		<div className="app-container">
 			<header className="header">
 				<h1>Last Frame Getter</h1>
-				<p className="subtitle">mp4 / webm の最後の 1 フレームを画像(PNG)にします</p>
+				<p className="subtitle">mp4 / webm の指定フレームを画像(PNG)にします</p>
 			</header>
 
 			<section
@@ -200,15 +222,48 @@ function App() {
 				</div>
 			</section>
 
-			<div className="controls">
-				{isImageLoaded && (
-					<button className="primary" onClick={handleDownload}>
-						ダウンロード
+			<div className="controls" style={{ flexDirection: 'column', alignItems: 'center' }}>
+				<div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+					<label>
+						FPS
+						<input
+							style={{ marginLeft: 8, width: 80 }}
+							type="number"
+							min={1}
+							max={120}
+							value={fps}
+							onChange={(e) => setFps(() => Math.max(1, Math.min(120, Number(e.target.value) || 30)))}
+						/>
+					</label>
+					<label>
+						Frame
+						<input
+							style={{ marginLeft: 8, width: 100 }}
+							type="number"
+							min={0}
+							max={Math.max(0, maxFrames - 1)}
+							value={selectedFrame}
+							onChange={(e) => setSelectedFrame(() => Math.max(0, Math.min(Math.max(0, maxFrames - 1), Number(e.target.value) || 0)))}
+						/>
+					</label>
+				</div>
+				<input
+					style={{ width: '100%', maxWidth: 640 }}
+					type="range"
+					min={0}
+					max={Math.max(0, maxFrames - 1)}
+					step={1}
+					value={selectedFrame}
+					onChange={(e) => setSelectedFrame(Number(e.target.value))}
+				/>
+				<div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+					<button className="primary" onClick={handleDownload} disabled={!imageUrl || isProcessing}>
+						このフレームをダウンロード
 					</button>
-				)}
-				<button onClick={handleClear} disabled={!videoFile && !imageUrl}>
-					クリア
-				</button>
+					<button onClick={handleClear} disabled={!videoFile && !imageUrl}>
+						クリア
+					</button>
+				</div>
 			</div>
 
 			{error && (
@@ -220,7 +275,7 @@ function App() {
 			<div className="preview">
 				{imageUrl ? (
 					<div className="preview-card">
-						<img src={imageUrl} alt="last frame preview" onLoad={() => setIsImageLoaded(true)} />
+						<img src={imageUrl} alt={`frame preview ${selectedFrame}`} />
 					</div>
 				) : (
 					<p className="placeholder">ここにプレビューが表示されます</p>
